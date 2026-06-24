@@ -575,6 +575,11 @@ h1 {
   padding: 0.5rem 0.875rem; background: rgba(217,119,6,0.07);
   border: 1px solid rgba(217,119,6,0.2); border-radius: var(--radius-sm);
 }
+.bracket-stage-note {
+  font-size: 0.75rem; color: var(--muted); margin-bottom: 1rem;
+  padding: 0.5rem 0.875rem; background: rgba(100,116,139,0.07);
+  border: 1px solid rgba(100,116,139,0.2); border-radius: var(--radius-sm);
+}
 
 .bracket-svg {
   position: absolute; inset: 0; width: 100%; height: 100%;
@@ -678,4 +683,171 @@ h1 {
   .p-teams { grid-template-columns: repeat(2, 1fr); }
   h1 { font-size: 1.1rem; }
   .header-ball { font-size: 1.5rem; }
+}
+
+/* ─── Form Pills ─────────────────────────────────────────────────────────── */
+.form-pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; border-radius: 3px;
+  font-size: 0.52rem; font-weight: 800; line-height: 1;
+  letter-spacing: 0; flex-shrink: 0; vertical-align: middle;
+}
+.form-pill--w { background: #dcfce7; color: #15803d; }
+.form-pill--d { background: #fef9c3; color: #92400e; }
+.form-pill--l { background: #fee2e2; color: #dc2626; }
+
+.g-form { display: inline-flex; gap: 2px; margin-left: 5px; vertical-align: middle; }
+
+/* ─── Team cell states (at-risk / qualified) ─────────────────────────────── */
+.team-cell--through {
+  background: rgba(22,163,74,0.08);
+  border: 1px solid rgba(22,163,74,0.22);
+}
+.team-cell--risk {
+  background: rgba(245,158,11,0.1);
+  border: 1px solid rgba(245,158,11,0.3);
+}
+
+.team-cell-badge {
+  font-size: 0.5rem; font-weight: 900; line-height: 1;
+  padding: 0.08rem 0.28rem; border-radius: 3px;
+  flex-shrink: 0; letter-spacing: 0.04em;
+}
+.team-cell-badge--q { background: rgba(22,163,74,0.15); color: #15803d; }
+.team-cell-badge--r { background: rgba(245,158,11,0.18); color: #b45309; }
+
+/* ─── Leaderboard win probability ───────────────────────────────────────── */
+.lb-win-prob {
+  font-size: 0.64rem; font-weight: 600; color: var(--muted);
+  text-align: right; margin-top: 0.18rem; letter-spacing: 0.01em;
+}
+
+/* ─── Insights Dashboard ────────────────────────────────────────────────── */
+.insights-dashboard { display: flex; flex-direction: column; gap: 1.25rem; }
+
+.insight-stat-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;
+}
+
+.insight-stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.insight-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+}
+
+.isc-value {
+  font-size: 2.2rem; font-weight: 900; color: var(--text);
+  line-height: 1; margin-bottom: 0.3rem;
+  background: linear-gradient(135deg, var(--text), var(--text-2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.isc-label {
+  font-size: 0.7rem; font-weight: 700; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: 0.07em;
+}
+.isc-sub { font-size: 0.67rem; color: var(--muted); margin-top: 0.2rem; }
+
+.insight-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;
+}
+
+.insight-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03);
+}
+
+.insight-card-title {
+  font-size: 0.88rem; font-weight: 800; color: var(--text);
+  margin-bottom: 0.2rem;
+}
+.insight-card-sub {
+  font-size: 0.68rem; color: var(--muted); margin-bottom: 1rem; line-height: 1.5;
+}
+
+/* ─── SVG Bar Chart ──────────────────────────────────────────────────────── */
+.chart-wrap { overflow: hidden; }
+.chart-svg  { display: block; width: 100%; height: auto; }
+
+/* ─── Performance Table ──────────────────────────────────────────────────── */
+.perf-table-wrap { overflow-x: auto; }
+
+.perf-table {
+  width: 100%; border-collapse: collapse; font-size: 0.79rem;
+}
+.perf-table th {
+  text-align: right; padding: 0.4rem 0.55rem;
+  color: var(--muted); font-size: 0.62rem; font-weight: 700;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.perf-table td {
+  text-align: right; padding: 0.5rem 0.55rem;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  color: var(--text-2); font-weight: 500;
+}
+.perf-table td:first-child { text-align: left; white-space: nowrap; }
+.perf-table tbody tr:hover { background: rgba(0,0,0,0.02); }
+.perf-table tbody tr:last-child td { border-bottom: none; }
+
+.perf-dot  { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; flex-shrink: 0; }
+.perf-name { font-weight: 600; color: var(--text); }
+.perf-w    { color: var(--green); font-weight: 700; }
+.perf-l    { color: var(--red); }
+.perf-pos  { color: var(--green); font-weight: 700; }
+.perf-neg  { color: var(--red); }
+
+/* ─── Form Guide ─────────────────────────────────────────────────────────── */
+.fg-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 1rem; margin-top: 0.75rem;
+}
+
+.fg-header {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.45rem 0.6rem; margin-bottom: 0.35rem;
+  border-radius: 0.4rem; background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.fg-avatar {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.62rem; font-weight: 900; color: #fff; flex-shrink: 0;
+}
+.fg-pname { font-weight: 700; font-size: 0.8rem; color: var(--text); }
+
+.fg-teams { display: flex; flex-direction: column; gap: 1px; }
+
+.fg-team {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.22rem 0.4rem; border-radius: 0.3rem;
+  font-size: 0.71rem; transition: background 0.1s;
+}
+.fg-team--out     { opacity: 0.28; }
+.fg-team--through { background: rgba(22,163,74,0.07); }
+.fg-team--risk    { background: rgba(245,158,11,0.09); }
+
+.fg-flag    { font-size: 0.88rem; flex-shrink: 0; }
+.fg-name    { flex: 1; font-weight: 500; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fg-form    { display: flex; gap: 2px; flex-shrink: 0; align-items: center; }
+.fg-nogames { font-size: 0.6rem; color: var(--muted); font-style: italic; }
+
+/* ─── Insights responsive ───────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .insight-row { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .insight-stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .fg-grid { grid-template-columns: 1fr; }
 }

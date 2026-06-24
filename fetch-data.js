@@ -105,16 +105,6 @@ async function main() {
     process.exit(1);
   }
 
-  process.stdout.write('  Fetching standings... ');
-  let standingsData;
-  try {
-    standingsData = await apiGet(`/competitions/${COMPETITION}/standings`);
-    console.log('OK');
-  } catch (err) {
-    console.error('\n  Error: ' + err.message);
-    process.exit(1);
-  }
-
   process.stdout.write('  Fetching matches...   ');
   let matchesData;
   try {
@@ -125,28 +115,10 @@ async function main() {
     process.exit(1);
   }
 
-  // ─── Process group standings ────────────────────────────────────────────────
-
-  const groupStandings = {};
-  (standingsData.standings || []).forEach(s => {
-    if (s.type !== 'TOTAL' || !s.group) return;
-    const letter = s.group.replace('GROUP_', '');
-    groupStandings[letter] = (s.table || []).map(row => ({
-      team:   norm(row.team.name),
-      played: row.playedGames,
-      won:    row.won,
-      drawn:  row.draw,
-      lost:   row.lost,
-      gf:     row.goalsFor,
-      ga:     row.goalsAgainst,
-      gd:     row.goalDifference,
-      points: row.points
-    }));
-  });
-
   // ─── Process matches ────────────────────────────────────────────────────────
 
   const groupMatches    = {};
+  const groupTeams      = {}; // all teams per group (from ALL matches, incl. scheduled)
   const knockoutMatches = { r32: [], r16: [], qf: [], sf: [], final: [] };
   const eliminated      = new Set();
 
@@ -163,6 +135,10 @@ async function main() {
     if (m.stage === 'GROUP_STAGE') {
       const letter = (m.group || '').replace('GROUP_', '');
       if (!groupMatches[letter]) groupMatches[letter] = [];
+      if (!groupTeams[letter])   groupTeams[letter]   = new Set();
+      // Collect teams from all matches (including scheduled) so every team appears
+      groupTeams[letter].add(home);
+      groupTeams[letter].add(away);
       groupMatches[letter].push({
         home, away,
         homeScore: hScore !== null ? hScore : null,
@@ -188,21 +164,70 @@ async function main() {
     }
   });
 
-  // 4th-place teams in completed groups are always eliminated
-  Object.values(groupStandings).forEach(table => {
-    if (table && table.length === 4 && table.every(r => r.played === 3)) {
-      eliminated.add(table[3].team);
-    }
+  // ─── Compute group standings from match results ──────────────────────────────
+  // Points: 3 for a win, 1 for a draw, 0 for a loss.
+
+  const groupStandings = {};
+  Object.entries(groupTeams).forEach(([letter, teamsSet]) => {
+    const stats = {};
+    teamsSet.forEach(t => {
+      stats[t] = { team: t, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0 };
+    });
+
+    (groupMatches[letter] || []).forEach(m => {
+      if (m.status !== 'FINISHED' || m.homeScore === null || m.awayScore === null) return;
+      const h = stats[m.home];
+      const a = stats[m.away];
+      if (!h || !a) return;
+
+      h.played++; a.played++;
+      h.gf += m.homeScore; h.ga += m.awayScore;
+      a.gf += m.awayScore; a.ga += m.homeScore;
+      h.gd = h.gf - h.ga;
+      a.gd = a.gf - a.ga;
+
+      if (m.homeScore > m.awayScore) {
+        h.won++; h.points += 3; a.lost++;
+      } else if (m.homeScore < m.awayScore) {
+        a.won++; a.points += 3; h.lost++;
+      } else {
+        h.drawn++; h.points += 1;
+        a.drawn++; a.points += 1;
+      }
+    });
+
+    // Sort: points → GD → GF
+    groupStandings[letter] = Object.values(stats)
+      .sort((a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf);
   });
-  // Note: 3rd-place qualification (8 best from 12) is complex to compute locally.
-  // Once the full group stage bracket is official, the API match data will reflect it
-  // and knockout losers will be auto-detected above.
+
+  // Guaranteed qualifiers and mathematical eliminations
+  const guaranteedQualified = new Set();
+  Object.values(groupStandings).forEach(table => {
+    if (table.length !== 4) return;
+    if (table.every(r => r.played === 3)) {
+      // Full group complete: 4th place is eliminated
+      eliminated.add(table[3].team);
+    } else {
+      // Mid-group: 4th place eliminated if they can't even reach 3rd's current pts
+      const thirdPts = table[2].points;
+      const fourth   = table[3];
+      if (fourth.points + 3 * (3 - fourth.played) < thirdPts) eliminated.add(fourth.team);
+    }
+    // Guaranteed top-2: fewer than 2 other teams can mathematically exceed this team's pts
+    table.forEach(row => {
+      const canBeat = table.filter(o => o.team !== row.team && (o.points + 3 * (3 - o.played)) > row.points).length;
+      if (canBeat < 2) guaranteedQualified.add(row.team);
+    });
+  });
+  // Note: 3rd-place qualification (best 8 of 12) depends on cross-group stats — not computed here.
 
   // ─── Write live.js ──────────────────────────────────────────────────────────
 
   const payload = {
     fetchedAt: new Date().toISOString(),
     eliminated: [...eliminated],
+    guaranteedQualified: [...guaranteedQualified],
     groupStandings,
     groupMatches,
     knockoutMatches
@@ -215,6 +240,13 @@ async function main() {
   ].join('\n') + '\n';
 
   fs.writeFileSync(OUT_FILE, js, 'utf8');
+
+  // Update cache-busting timestamp on the live.js script tag in index.html
+  const indexPath = path.join(__dirname, 'index.html');
+  const ts = payload.fetchedAt.replace(/[^0-9]/g, '').slice(0, 14);
+  let html = fs.readFileSync(indexPath, 'utf8');
+  html = html.replace(/src="live\.js(?:\?v=[^"]*)?"/,  `src="live.js?v=${ts}"`);
+  fs.writeFileSync(indexPath, html, 'utf8');
 
   const allMatches   = matchesData.matches || [];
   const finishedCount = allMatches.filter(m => m.status === 'FINISHED').length;
@@ -230,7 +262,7 @@ async function main() {
   // ─── Auto-push to GitHub Pages (if git is configured) ──────────────────────
   try {
     execSync('git rev-parse --is-inside-work-tree', { stdio: 'ignore', cwd: __dirname });
-    execSync('git add "' + OUT_FILE + '"', { stdio: 'ignore', cwd: __dirname });
+    execSync('git add "' + OUT_FILE + '" "' + indexPath + '"', { stdio: 'ignore', cwd: __dirname });
     execSync('git commit -m "Auto-update live data"', { cwd: __dirname, stdio: 'ignore' });
     execSync('git push', { cwd: __dirname, stdio: 'ignore' });
     console.log('  Pushed live.js to GitHub — site updated for everyone.');

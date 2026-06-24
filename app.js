@@ -96,6 +96,140 @@ function fmtDate(isoStr) {
     + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
+// ─── Insights helpers ─────────────────────────────────────────────────────────
+
+function getTeamMatchHistory(team) {
+  if (!LIVE) return [];
+  const matches = [];
+  Object.values(LIVE.groupMatches || {}).forEach(function(ms) {
+    ms.forEach(function(m) {
+      if (m.status !== 'FINISHED') return;
+      if (m.home === team) {
+        matches.push({ result: m.homeScore > m.awayScore ? 'W' : m.homeScore < m.awayScore ? 'L' : 'D', gf: m.homeScore, ga: m.awayScore, date: m.date });
+      } else if (m.away === team) {
+        matches.push({ result: m.awayScore > m.homeScore ? 'W' : m.awayScore < m.homeScore ? 'L' : 'D', gf: m.awayScore, ga: m.homeScore, date: m.date });
+      }
+    });
+  });
+  Object.values(LIVE.knockoutMatches || {}).forEach(function(ms) {
+    ms.forEach(function(m) {
+      if (m.status !== 'FINISHED') return;
+      if (m.home === team) {
+        matches.push({ result: m.winner === team ? 'W' : 'L', gf: m.homeScore || 0, ga: m.awayScore || 0, date: m.date });
+      } else if (m.away === team) {
+        matches.push({ result: m.winner === team ? 'W' : 'L', gf: m.awayScore || 0, ga: m.homeScore || 0, date: m.date });
+      }
+    });
+  });
+  return matches.sort(function(a, b) { return new Date(a.date) - new Date(b.date); });
+}
+
+function getTeamForm(team, n) {
+  n = n || 3;
+  return getTeamMatchHistory(team).slice(-n).map(function(m) { return m.result; });
+}
+
+function isAtRisk(team) {
+  if (!LIVE || isOut(team)) return false;
+  if ((LIVE.guaranteedQualified || []).includes(team)) return false;
+  const grp = TEAM_GROUP[team];
+  const idx = ((LIVE.groupStandings || {})[grp] || []).findIndex(function(r) { return r.team === team; });
+  if (idx < 2) return false;
+  return ((LIVE.groupMatches || {})[grp] || []).some(function(m) {
+    return m.status !== 'FINISHED' && (m.home === team || m.away === team);
+  });
+}
+
+function calcParticipantStats(p) {
+  var gf = 0, ga = 0, w = 0, d = 0, l = 0, cs = 0;
+  p.teams.forEach(function(t) {
+    getTeamMatchHistory(t).forEach(function(m) {
+      gf += m.gf; ga += m.ga;
+      if (m.result === 'W') w++;
+      else if (m.result === 'D') d++;
+      else l++;
+      if (m.ga === 0) cs++;
+    });
+  });
+  return { gf: gf, ga: ga, gd: gf - ga, w: w, d: d, l: l, cs: cs, played: w + d + l };
+}
+
+function calcWinProbabilities() {
+  if (!LIVE) return {};
+  const liveGuaranteed = LIVE.guaranteedQualified || [];
+
+  function teamSurvivalProb(team) {
+    if (state.eliminated.has(team)) return 0;
+    if (liveGuaranteed.includes(team)) return 1.0;
+    const grp      = TEAM_GROUP[team];
+    const standing = (LIVE.groupStandings || {})[grp] || [];
+    const gMatches = (LIVE.groupMatches  || {})[grp] || [];
+    const hasLeft  = gMatches.some(function(m) {
+      return m.status !== 'FINISHED' && (m.home === team || m.away === team);
+    });
+    if (!hasLeft) {
+      const idx = standing.findIndex(function(r) { return r.team === team; });
+      return idx < 2 ? 1.0 : 0;
+    }
+    const idx = standing.findIndex(function(r) { return r.team === team; });
+    return ([0.88, 0.72, 0.28, 0.10][idx] !== undefined ? [0.88, 0.72, 0.28, 0.10][idx] : 0.10);
+  }
+
+  const paying = PARTICIPANTS.filter(function(p) { return p.pays; });
+  const scores = {};
+  paying.forEach(function(p) {
+    scores[p.id] = p.teams.reduce(function(s, t) { return s + teamSurvivalProb(t); }, 0);
+  });
+  const total = Object.values(scores).reduce(function(a, b) { return a + b; }, 0);
+  const probs = {};
+  paying.forEach(function(p) {
+    probs[p.id] = total > 0 ? scores[p.id] / total : 1 / paying.length;
+  });
+  return probs;
+}
+
+function formPill(r) {
+  return '<span class="form-pill form-pill--' + r.toLowerCase() + '">' + r + '</span>';
+}
+
+function renderHBarChart(items, getValue, getLabel, getColor, opts) {
+  opts     = opts || {};
+  const fmt    = opts.format    || function(v) { return String(v); };
+  const sec    = opts.secondary || null;
+  const barH   = opts.height    || 30;
+  const gap    = opts.gap       || 8;
+  const labelW = opts.labelW    || 80;
+  const valW   = opts.valW      || 48;
+  const cW     = opts.chartW    || 480;
+  const barW   = cW - labelW - valW;
+
+  const primVals = items.map(getValue);
+  const secVals  = sec ? items.map(sec) : [];
+  const max      = Math.max.apply(null, primVals.concat(secVals).concat([1]));
+  const totalH   = items.length * (barH + gap) - gap;
+
+  const bars = items.map(function(item, i) {
+    const v   = getValue(item);
+    const bw  = Math.round((v / max) * barW);
+    const y   = i * (barH + gap);
+    const col = getColor(item);
+    const mid = y + barH / 2 + 4.5;
+    let secR  = '';
+    if (sec) {
+      const sv  = sec(item);
+      const sbw = Math.round((sv / max) * barW);
+      secR = '<rect x="' + labelW + '" y="' + y + '" width="' + sbw + '" height="' + barH + '" rx="3" fill="' + col + '" opacity="0.18"/>';
+    }
+    return '<text x="' + (labelW - 8) + '" y="' + mid + '" text-anchor="end" fill="#475569" font-size="11.5" font-weight="600" font-family="Inter,system-ui,sans-serif">' + getLabel(item) + '</text>'
+      + '<rect x="' + labelW + '" y="' + y + '" width="' + barW + '" height="' + barH + '" rx="3" fill="#e2e8f0"/>'
+      + secR
+      + (bw > 0 ? '<rect x="' + labelW + '" y="' + y + '" width="' + bw + '" height="' + barH + '" rx="3" fill="' + col + '" opacity="0.88"/>' : '')
+      + '<text x="' + (labelW + Math.max(bw, 1) + 6) + '" y="' + mid + '" fill="#64748b" font-size="11.5" font-weight="700" font-family="Inter,system-ui,sans-serif">' + fmt(v) + '</text>';
+  }).join('');
+
+  return '<div class="chart-wrap"><svg viewBox="0 0 ' + cW + ' ' + totalH + '" preserveAspectRatio="xMidYMid meet" class="chart-svg">' + bars + '</svg></div>';
+}
+
 // ─── Sync status bar ──────────────────────────────────────────────────────────
 
 function renderSyncBar() {
@@ -124,12 +258,14 @@ function renderSyncBar() {
 
 function renderLeaderboard() {
   const sorted = sortedParticipants();
+  const probs  = calcWinProbabilities();
   const rows = sorted.map((p, i) => {
-    const left = teamsLeft(p);
-    const total = p.teams.length;
-    const out  = left === 0;
-    const pct  = total ? (left / total * 100) : 0;
+    const left    = teamsLeft(p);
+    const total   = p.teams.length;
+    const out     = left === 0;
+    const pct     = total ? (left / total * 100) : 0;
     const rankCls = i === 0 ? 'lb-pos--1' : i === 1 ? 'lb-pos--2' : i === 2 ? 'lb-pos--3' : '';
+    const winPct  = p.pays && !out ? Math.round((probs[p.id] || 0) * 100) : null;
     return `
       <div class="lb-row ${out ? 'lb-row--out' : ''}">
         <div class="lb-pos ${rankCls}">${i + 1}</div>
@@ -146,7 +282,8 @@ function renderLeaderboard() {
         <div class="lb-stat">
           ${out
             ? '<span class="lb-out-label">OUT</span>'
-            : `<span class="lb-num" style="color:${p.color}">${left}</span><span class="lb-denom">/${total}</span>`
+            : `<div><span class="lb-num" style="color:${p.color}">${left}</span><span class="lb-denom">/${total}</span></div>
+               ${winPct !== null ? `<div class="lb-win-prob">${winPct}% win</div>` : ''}`
           }
         </div>
       </div>`;
@@ -162,13 +299,20 @@ function renderParticipantCard(p) {
   const out   = left === 0;
   const pct   = total ? (left / total * 100).toFixed(1) : 0;
 
+  const liveQ = LIVE ? (LIVE.guaranteedQualified || []) : [];
   const teamCells = p.teams.map(t => {
-    const eliminated = isOut(t);
-    const grp = TEAM_GROUP[t];
+    const eliminated  = isOut(t);
+    const guaranteed  = liveQ.includes(t);
+    const risk        = isAtRisk(t);
+    const grp         = TEAM_GROUP[t];
+    const cellCls     = eliminated ? 'team-cell--out' : guaranteed ? 'team-cell--through' : risk ? 'team-cell--risk' : 'team-cell--active';
+    const badge       = guaranteed && !eliminated ? '<span class="team-cell-badge team-cell-badge--q">Q</span>'
+                      : risk ? '<span class="team-cell-badge team-cell-badge--r">!</span>' : '';
     return `
-      <div class="team-cell ${eliminated ? 'team-cell--out' : 'team-cell--active'}">
+      <div class="team-cell ${cellCls}">
         <span class="team-flag">${flag(t)}</span>
         <span class="team-cell-name">${t}</span>
+        ${badge}
         <span class="team-cell-grp">${grp}</span>
       </div>`;
   }).join('');
@@ -366,14 +510,19 @@ function renderGroupCard(letter, teams) {
     ? standing
     : teams.map(t => ({ team: t, played: 0, won: 0, drawn: 0, lost: 0, gd: 0, points: 0 }));
 
-  const allPlayed = standing && standing.every(r => r.played === 3);
+  const allPlayed      = standing && standing.every(r => r.played === 3);
+  const liveGuaranteed = LIVE ? (LIVE.guaranteedQualified || []) : [];
 
   const tableRows = rows.map((row, i) => {
     const out     = isOut(row.team);
     const o       = TEAM_OWNER[row.team];
-    const advance = !!(standing && i < 2 && allPlayed);
+    const advance = !!(standing && i < 2 && (allPlayed || liveGuaranteed.includes(row.team)));
     const rowCls  = out ? 'g-elim' : advance ? 'g-advanced' : '';
     const gdStr   = row.gd > 0 ? '+' + row.gd : String(row.gd);
+    const form    = getTeamForm(row.team, 3);
+    const formHtml = form.length
+      ? '<span class="g-form">' + form.map(formPill).join('') + '</span>'
+      : '';
 
     return '<tr class="' + rowCls + '">'
       + '<td class="g-pos">' + (i + 1) + '</td>'
@@ -381,6 +530,7 @@ function renderGroupCard(letter, teams) {
       +   '<span class="g-flag">' + flag(row.team) + '</span>'
       +   '<span class="g-name">' + row.team + '</span>'
       +   (o ? '<span class="g-owner-dot" style="background:' + o.color + '" title="' + o.name + '"></span>' : '')
+      +   formHtml
       + '</td>'
       + '<td>' + row.played + '</td>'
       + '<td>' + row.won   + '</td>'
@@ -435,6 +585,205 @@ function renderGroups() {
   return renderSyncBar()
     + '<div class="groups-legend">' + legend + '</div>'
     + '<div class="g-grid">' + groupCards + '</div>';
+}
+
+// ─── Render: Insights ─────────────────────────────────────────────────────────
+
+function renderInsights() {
+  if (!LIVE) {
+    return renderSyncBar()
+      + '<div class="scores-empty"><p>No live data yet.</p>'
+      + '<p>Run <code>node C:\\sweepstake\\fetch-data.js</code> to sync.</p></div>';
+  }
+
+  const probs    = calcWinProbabilities();
+  const paying   = PARTICIPANTS.filter(function(p) { return p.pays; });
+  const statsMap = {};
+  PARTICIPANTS.forEach(function(p) { statsMap[p.id] = calcParticipantStats(p); });
+
+  // Tournament-wide totals
+  let goalsTotal = 0, matchesPlayed = 0;
+  Object.values(LIVE.groupMatches || {}).flat().forEach(function(m) {
+    if (m.status === 'FINISHED') { goalsTotal += m.homeScore + m.awayScore; matchesPlayed++; }
+  });
+  Object.values(LIVE.knockoutMatches || {}).flat().forEach(function(m) {
+    if (m.status === 'FINISHED') { goalsTotal += (m.homeScore || 0) + (m.awayScore || 0); matchesPlayed++; }
+  });
+  const teamsAlive    = ALL_TEAMS.filter(function(t) { return !state.eliminated.has(t); }).length;
+  const groupsDecided = Object.values(LIVE.groupStandings || {}).filter(function(s) {
+    return s.length && s.every(function(r) { return r.played === 3; });
+  }).length;
+
+  // ── Headline stat cards ────────────────────────────────────────────────────
+  const statCards = '<div class="insight-stat-grid">'
+    + '<div class="insight-stat-card">'
+    +   '<div class="isc-value">' + goalsTotal + '</div>'
+    +   '<div class="isc-label">Total Goals</div>'
+    +   '<div class="isc-sub">' + (matchesPlayed > 0 ? (goalsTotal / matchesPlayed).toFixed(2) : '—') + ' per game</div>'
+    + '</div>'
+    + '<div class="insight-stat-card">'
+    +   '<div class="isc-value">' + matchesPlayed + '</div>'
+    +   '<div class="isc-label">Games Played</div>'
+    +   '<div class="isc-sub">of 104 total</div>'
+    + '</div>'
+    + '<div class="insight-stat-card">'
+    +   '<div class="isc-value">' + teamsAlive + '</div>'
+    +   '<div class="isc-label">Teams Alive</div>'
+    +   '<div class="isc-sub">of ' + ALL_TEAMS.length + '</div>'
+    + '</div>'
+    + '<div class="insight-stat-card">'
+    +   '<div class="isc-value">' + groupsDecided + '</div>'
+    +   '<div class="isc-label">Groups Done</div>'
+    +   '<div class="isc-sub">of 12</div>'
+    + '</div>'
+    + '</div>';
+
+  // ── Win probability chart ──────────────────────────────────────────────────
+  const probItems = paying.slice().sort(function(a, b) { return (probs[b.id] || 0) - (probs[a.id] || 0); });
+  const probChart = renderHBarChart(
+    probItems,
+    function(p) { return Math.round((probs[p.id] || 0) * 100); },
+    function(p) { return p.name; },
+    function(p) { return p.color; },
+    { format: function(v) { return v + '%'; }, height: 32, gap: 10, chartW: 440, labelW: 72 }
+  );
+
+  // ── Goals scored chart (conceded shown as ghost bar) ──────────────────────
+  const goalItems = PARTICIPANTS.slice().sort(function(a, b) { return statsMap[b.id].gf - statsMap[a.id].gf; });
+  const goalsChart = renderHBarChart(
+    goalItems,
+    function(p) { return statsMap[p.id].gf; },
+    function(p) { return p.name; },
+    function(p) { return p.color; },
+    { secondary: function(p) { return statsMap[p.id].ga; }, height: 32, gap: 10, chartW: 440, labelW: 72 }
+  );
+
+  // ── Performance table ──────────────────────────────────────────────────────
+  const perfRows = PARTICIPANTS.slice()
+    .sort(function(a, b) {
+      const sa = statsMap[a.id], sb = statsMap[b.id];
+      return sb.w !== sa.w ? sb.w - sa.w : sb.gf - sa.gf;
+    })
+    .map(function(p) {
+      const s   = statsMap[p.id];
+      const gdStr = s.gd >= 0 ? '+' + s.gd : String(s.gd);
+      return '<tr>'
+        + '<td><span class="perf-dot" style="background:' + p.color + '"></span>'
+        +      '<span class="perf-name">' + p.name + '</span>'
+        +      (!p.pays ? ' <span class="lb-nostake">no stake</span>' : '') + '</td>'
+        + '<td>' + s.played + '</td>'
+        + '<td class="perf-w">' + s.w + '</td>'
+        + '<td class="perf-d">' + s.d + '</td>'
+        + '<td class="perf-l">' + s.l + '</td>'
+        + '<td>' + s.gf + '</td>'
+        + '<td>' + s.ga + '</td>'
+        + '<td class="' + (s.gd >= 0 ? 'perf-pos' : 'perf-neg') + '">' + gdStr + '</td>'
+        + '<td>' + s.cs + '</td>'
+        + '</tr>';
+    }).join('');
+
+  const perfTable = '<div class="perf-table-wrap"><table class="perf-table">'
+    + '<thead><tr>'
+    + '<th style="text-align:left">Participant</th>'
+    + '<th title="Played">P</th><th title="Won">W</th><th title="Drawn">D</th><th title="Lost">L</th>'
+    + '<th title="Goals For">GF</th><th title="Goals Against">GA</th>'
+    + '<th title="Goal Difference">GD</th><th title="Clean Sheets">CS</th>'
+    + '</tr></thead>'
+    + '<tbody>' + perfRows + '</tbody>'
+    + '</table></div>';
+
+  // ── Top scoring teams chart ────────────────────────────────────────────────
+  const teamGoals = ALL_TEAMS.map(function(t) {
+    const gf  = getTeamMatchHistory(t).reduce(function(s, m) { return s + m.gf; }, 0);
+    const o   = TEAM_OWNER[t];
+    return { team: t, gf: gf, color: o ? o.color : '#94a3b8' };
+  }).filter(function(t) { return t.gf > 0; })
+    .sort(function(a, b) { return b.gf - a.gf; })
+    .slice(0, 12);
+
+  const topTeamsChart = renderHBarChart(
+    teamGoals,
+    function(t) { return t.gf; },
+    function(t) { return flag(t.team) + ' ' + (t.team.length > 15 ? t.team.slice(0, 13) + '…' : t.team); },
+    function(t) { return t.color; },
+    { height: 26, gap: 7, chartW: 440, labelW: 140 }
+  );
+
+  // ── Clean sheets chart ─────────────────────────────────────────────────────
+  const csItems = PARTICIPANTS.slice().sort(function(a, b) { return statsMap[b.id].cs - statsMap[a.id].cs; });
+  const csChart = renderHBarChart(
+    csItems,
+    function(p) { return statsMap[p.id].cs; },
+    function(p) { return p.name; },
+    function(p) { return p.color; },
+    { height: 32, gap: 10, chartW: 440, labelW: 72 }
+  );
+
+  // ── Form guide per participant ─────────────────────────────────────────────
+  const liveGuaranteed2 = LIVE.guaranteedQualified || [];
+  const formGuide = PARTICIPANTS.map(function(p) {
+    const teamRows = p.teams.map(function(t) {
+      const form      = getTeamForm(t, 3);
+      const out       = isOut(t);
+      const through   = liveGuaranteed2.includes(t);
+      const risk      = isAtRisk(t);
+      const cls       = out ? 'fg-team--out' : through ? 'fg-team--through' : risk ? 'fg-team--risk' : '';
+      const pills     = form.map(formPill).join('');
+      const noGames   = !form.length ? '<span class="fg-nogames">No games</span>' : '';
+      return '<div class="fg-team ' + cls + '">'
+        + '<span class="fg-flag">' + flag(t) + '</span>'
+        + '<span class="fg-name">' + t + '</span>'
+        + '<span class="fg-form">' + pills + noGames + '</span>'
+        + '</div>';
+    }).join('');
+    return '<div class="fg-person">'
+      + '<div class="fg-header" style="border-left:3px solid ' + p.color + '">'
+      +   '<span class="fg-avatar" style="background:' + p.color + '">' + p.name[0] + '</span>'
+      +   '<span class="fg-pname">' + p.name + '</span>'
+      + '</div>'
+      + '<div class="fg-teams">' + teamRows + '</div>'
+      + '</div>';
+  }).join('');
+
+  // ── Assemble dashboard ─────────────────────────────────────────────────────
+  return renderSyncBar()
+    + '<div class="insights-dashboard">'
+    + statCards
+    + '<div class="insight-row">'
+    +   '<div class="insight-card">'
+    +     '<div class="insight-card-title">🏆 Win Probability</div>'
+    +     '<div class="insight-card-sub">Estimated chance of winning the £50 pot based on group stage survival odds</div>'
+    +     probChart
+    +   '</div>'
+    +   '<div class="insight-card">'
+    +     '<div class="insight-card-title">⚽ Goals Scored vs Conceded</div>'
+    +     '<div class="insight-card-sub">Solid bar = scored · faded bar = conceded · sorted by goals scored</div>'
+    +     goalsChart
+    +   '</div>'
+    + '</div>'
+    + '<div class="insight-card">'
+    +   '<div class="insight-card-title">📊 Participant Performance</div>'
+    +   '<div class="insight-card-sub">Aggregated across all teams · CS = clean sheets</div>'
+    +   perfTable
+    + '</div>'
+    + '<div class="insight-row">'
+    +   '<div class="insight-card">'
+    +     '<div class="insight-card-title">🌟 Top Scoring Teams</div>'
+    +     '<div class="insight-card-sub">Colour indicates owner · top 12 by goals scored</div>'
+    +     topTeamsChart
+    +   '</div>'
+    +   '<div class="insight-card">'
+    +     '<div class="insight-card-title">🧤 Clean Sheets</div>'
+    +     '<div class="insight-card-sub">Total shutouts across each participant\'s teams</div>'
+    +     csChart
+    +   '</div>'
+    + '</div>'
+    + '<div class="insight-card">'
+    +   '<div class="insight-card-title">📈 Team Form Guide</div>'
+    +   '<div class="insight-card-sub">Last 3 results · <span class="form-pill form-pill--w">W</span> win · <span class="form-pill form-pill--d">D</span> draw · <span class="form-pill form-pill--l">L</span> loss · green = qualified · amber = at risk · grey = out</div>'
+    +   '<div class="fg-grid">' + formGuide + '</div>'
+    + '</div>'
+    + '</div>';
 }
 
 // ─── Render: Bracket ──────────────────────────────────────────────────────────
@@ -511,8 +860,14 @@ function renderBracket() {
     ? '<p class="bracket-admin-note">⚙ Admin mode — select teams and mark winners in the bracket below.</p>'
     : '';
 
+  const r32Empty = LIVE && (LIVE.knockoutMatches.r32 || []).length === 0;
+  const r32Note  = (r32Empty && !state.adminOpen)
+    ? '<p class="bracket-stage-note">⏳ Round of 32 slots not yet assigned by FIFA — the bracket will auto-fill once all group games complete. Teams guaranteed to advance are highlighted in the Groups tab.</p>'
+    : '';
+
   return renderSyncBar()
     + note
+    + r32Note
     + '<div class="bracket-wrap"><div class="bracket">' + cols + '</div></div>';
 }
 
@@ -606,6 +961,7 @@ function renderMain() {
   if      (state.view === 'overview') root.innerHTML = renderOverview();
   else if (state.view === 'scores')   root.innerHTML = renderScores();
   else if (state.view === 'groups')   root.innerHTML = renderGroups();
+  else if (state.view === 'insights') root.innerHTML = renderInsights();
   else if (state.view === 'bracket') {
     root.innerHTML = renderBracket();
     requestAnimationFrame(drawBracketConnectors);
