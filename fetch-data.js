@@ -83,8 +83,8 @@ function apiGet(urlPath) {
 // ─── Stage key mapping ────────────────────────────────────────────────────────
 
 const STAGE_KEY = {
-  ROUND_OF_32:    'r32',
-  ROUND_OF_16:    'r16',
+  LAST_32:        'r32',
+  LAST_16:        'r16',
   QUARTER_FINALS: 'qf',
   SEMI_FINALS:    'sf',
   FINAL:          'final'
