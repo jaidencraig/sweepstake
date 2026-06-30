@@ -962,39 +962,49 @@ function drawBracketConnectors() {
   const rounds = Array.from(bracket.querySelectorAll('.b-round'));
   const bRect  = bracket.getBoundingClientRect();
 
+  // Rounded-elbow path from a feeder match (x1,y1) across the gap (midX) into the
+  // next match (x3,y3).
+  const elbow = (x1, y1, x3, y3, midX) => {
+    const r   = Math.min(12, Math.abs(y3 - y1) / 2);
+    const dir = y3 >= y1 ? 1 : -1;
+    return `M ${x1} ${y1} H ${midX - r}`
+      + ` Q ${midX} ${y1} ${midX} ${y1 + dir * r}`
+      + ` V ${y3 - dir * r}`
+      + ` Q ${midX} ${y3} ${midX + r} ${y3}`
+      + ` H ${x3}`;
+  };
+
+  const addPath = (d, advanced) => {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', advanced ? 'rgba(217,119,6,0.55)' : 'rgba(15,23,42,0.13)');
+    path.setAttribute('stroke-width', advanced ? '2.5' : '1.75');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(path);
+  };
+
   for (let r = 0; r < rounds.length - 1; r++) {
     const curMatches  = Array.from(rounds[r].querySelectorAll('.b-match'));
     const nextMatches = Array.from(rounds[r + 1].querySelectorAll('.b-match'));
 
     nextMatches.forEach((nMatch, i) => {
-      const mA = curMatches[i * 2];
-      const mB = curMatches[i * 2 + 1];
-      if (!mA || !nMatch) return;
-
-      const aR = mA.getBoundingClientRect();
       const nR = nMatch.getBoundingClientRect();
-      const x1 = aR.right  - bRect.left;
-      const y1 = (aR.top + aR.bottom) / 2 - bRect.top;
-      const x3 = nR.left   - bRect.left;
+      const x3 = nR.left - bRect.left;
       const y3 = (nR.top + nR.bottom) / 2 - bRect.top;
-      const midX = x1 + (x3 - x1) * 0.5;
 
-      let d = `M ${x1} ${y1} H ${midX} V ${y3} H ${x3}`;
-
-      if (mB) {
-        const bR2 = mB.getBoundingClientRect();
-        const x2  = bR2.right - bRect.left;
-        const y2  = (bR2.top + bR2.bottom) / 2 - bRect.top;
-        d += ` M ${x2} ${y2} H ${midX}`;
-      }
-
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', d);
-      path.setAttribute('fill', 'none');
-      path.setAttribute('stroke', 'rgba(0,0,0,0.12)');
-      path.setAttribute('stroke-width', '1.5');
-      path.setAttribute('stroke-linecap', 'round');
-      svg.appendChild(path);
+      [curMatches[i * 2], curMatches[i * 2 + 1]].forEach(feeder => {
+        if (!feeder) return;
+        const fR   = feeder.getBoundingClientRect();
+        const x1   = fR.right - bRect.left;
+        const y1   = (fR.top + fR.bottom) / 2 - bRect.top;
+        const midX = x1 + (x3 - x1) * 0.5;
+        // A feeder whose winner is decided lights the line gold — tracing the
+        // path of teams still advancing through the bracket.
+        const advanced = !!feeder.querySelector('.b-team--winner');
+        addPath(elbow(x1, y1, x3, y3, midX), advanced);
+      });
     });
   }
 

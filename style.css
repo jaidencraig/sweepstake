@@ -514,62 +514,88 @@ h1 {
 }
 
 /* ─── Bracket View ────────────────────────────────────────────────────────── */
-.bracket-wrap { overflow: auto; max-height: calc(100vh - 180px); padding-bottom: 1rem; }
-.bracket { display: flex; gap: 0; min-width: 860px; position: relative; }
-.b-round { flex: 1; display: flex; flex-direction: column; min-width: 160px; }
+.bracket-wrap {
+  overflow: auto;
+  max-height: calc(100vh - 170px);
+  padding: 0.5rem 0.25rem 2rem;
+}
+.bracket {
+  display: flex;
+  gap: 2.25rem;
+  min-width: 1180px;
+  position: relative;
+  padding: 0.5rem 0.25rem;
+}
+.b-round { flex: 1; display: flex; flex-direction: column; min-width: 208px; }
 .b-round-label {
-  text-align: center; font-size: 0.62rem; font-weight: 800;
-  text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold);
-  padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--border);
-  margin-bottom: 0.5rem;
+  align-self: center;
+  font-size: 0.64rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.14em; color: var(--gold-2);
+  padding: 0.4rem 0.9rem; margin-bottom: 1.25rem;
+  background: rgba(217,119,6,0.08);
+  border: 1px solid rgba(217,119,6,0.18);
+  border-radius: 999px;
 }
 .b-round-matches {
   flex: 1; display: flex; flex-direction: column;
-  justify-content: space-around; gap: 0; padding: 0 8px;
+  justify-content: space-around; gap: 0; padding: 0 4px;
 }
 .b-match {
   background: var(--surface);
   border: 1px solid var(--border);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  border-radius: 0.5rem; overflow: hidden; position: relative; z-index: 2;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  box-shadow: 0 2px 6px rgba(15,23,42,0.05), 0 1px 2px rgba(15,23,42,0.04);
+  border-radius: 0.85rem; overflow: hidden; position: relative; z-index: 2;
+  transition: transform 0.15s ease, border-color 0.15s, box-shadow 0.15s;
   flex: 0 0 auto;
 }
 .b-match:hover {
-  border-color: rgba(0,0,0,0.18);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+  border-color: var(--border-2);
+  box-shadow: 0 10px 28px rgba(15,23,42,0.12);
 }
 
 .b-team {
-  display: flex; align-items: center; gap: 0.4rem;
-  padding: 0.35rem 0.6rem; font-size: 0.72rem; font-weight: 500;
-  border-bottom: 1px solid var(--border); min-height: 32px;
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.62rem 0.85rem; font-size: 0.82rem; font-weight: 600;
+  border-bottom: 1px solid var(--border); min-height: 46px;
   color: var(--text-2);
+  transition: background 0.15s;
 }
 .b-team:last-of-type { border-bottom: none; }
-.b-team--tbd { color: var(--muted); font-style: italic; }
-.b-team--winner { font-weight: 800; color: var(--text); }
-.b-team--loser { opacity: 0.3; text-decoration: line-through; }
+.b-team--tbd { color: var(--muted); font-weight: 500; }
+.b-team--winner {
+  font-weight: 800; color: var(--text);
+  background: linear-gradient(90deg, rgba(217,119,6,0.12), rgba(217,119,6,0.02));
+}
+.b-team--loser { opacity: 0.45; color: var(--muted); }
 
-.b-flag { font-size: 0.85rem; flex-shrink: 0; }
+.b-flag { font-size: 1.15rem; line-height: 1; flex-shrink: 0; }
 .b-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.b-owner-pip { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.b-check { color: var(--gold); font-weight: 800; font-size: 0.8rem; flex-shrink: 0; }
+.b-owner-pip {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px rgba(0,0,0,0.06);
+}
+.b-check {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; flex-shrink: 0;
+  background: var(--gold); color: #fff; border-radius: 50%;
+  font-size: 0.66rem; font-weight: 900;
+}
 
 .b-winner-row {
-  padding: 0.25rem 0.5rem; background: rgba(217,119,6,0.06);
-  border-top: 1px solid var(--border); font-size: 0.68rem; color: var(--gold);
+  padding: 0.4rem 0.6rem; background: rgba(217,119,6,0.06);
+  border-top: 1px solid var(--border); font-size: 0.72rem; color: var(--gold-2);
 }
 .b-winner-row select {
-  background: transparent; border: none; color: var(--gold);
-  font-size: 0.68rem; width: 100%; cursor: pointer;
+  background: transparent; border: none; color: var(--gold-2);
+  font-size: 0.72rem; width: 100%; cursor: pointer; font-weight: 600;
 }
 
 .b-team select,
 .bracket-select {
   background: var(--surface-2); border: 1px solid var(--border);
-  color: var(--text); border-radius: 3px; padding: 0.15rem 0.3rem;
-  font-size: 0.68rem; width: 100%; cursor: pointer;
+  color: var(--text); border-radius: var(--radius-xs); padding: 0.25rem 0.4rem;
+  font-size: 0.74rem; width: 100%; cursor: pointer;
 }
 
 .bracket-admin-note {
