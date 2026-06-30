@@ -807,6 +807,7 @@ function renderTeamSlot(team, isWinner, isLoser, round, matchIdx, slot) {
   return '<div class="b-team ' + cls + '" style="' + border + '">'
     + '<span class="b-flag">' + flag(team) + '</span>'
     + '<span class="b-name">' + team + '</span>'
+    + (isWinner ? '<span class="b-check" title="Advanced">✓</span>' : '')
     + (o ? '<span class="b-owner-pip" style="background:' + o.color + '" title="' + o.name + '"></span>' : '')
     + '</div>';
 }
@@ -826,11 +827,10 @@ function renderBracketMatch(m, round, idx) {
       .join('');
     winnerRow = '<div class="b-winner-row"><select class="bracket-select" data-round="' + round
       + '" data-match="' + idx + '" data-slot="winner">' + opts + '</select></div>';
-  } else if (winner) {
-    const o = TEAM_OWNER[winner];
-    winnerRow = '<div class="b-winner-row" style="color:' + (o ? o.color : 'var(--gold)') + '">'
-      + '✓ ' + flag(winner) + ' ' + winner + '</div>';
   }
+  // In read mode the advancing team is shown via the ✓ + winner styling on its
+  // own row, so no separate winner row is rendered — this keeps every match box
+  // the same height, which is what lets the bracket tree line up cleanly.
 
   return '<div class="b-match">'
     + renderTeamSlot(teamA, wA, lA, round, idx, 'teamA')

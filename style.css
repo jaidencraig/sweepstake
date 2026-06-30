@@ -525,7 +525,7 @@ h1 {
 }
 .b-round-matches {
   flex: 1; display: flex; flex-direction: column;
-  justify-content: space-around; gap: 0.35rem; padding: 0 8px;
+  justify-content: space-around; gap: 0; padding: 0 8px;
 }
 .b-match {
   background: var(--surface);
@@ -533,6 +533,7 @@ h1 {
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   border-radius: 0.5rem; overflow: hidden; position: relative; z-index: 2;
   transition: border-color 0.15s, box-shadow 0.15s;
+  flex: 0 0 auto;
 }
 .b-match:hover {
   border-color: rgba(0,0,0,0.18);
@@ -553,6 +554,7 @@ h1 {
 .b-flag { font-size: 0.85rem; flex-shrink: 0; }
 .b-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .b-owner-pip { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.b-check { color: var(--gold); font-weight: 800; font-size: 0.8rem; flex-shrink: 0; }
 
 .b-winner-row {
   padding: 0.25rem 0.5rem; background: rgba(217,119,6,0.06);
