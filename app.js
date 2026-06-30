@@ -839,6 +839,48 @@ function renderBracketMatch(m, round, idx) {
     + '</div>';
 }
 
+// Work out the vertical order to DISPLAY each round in so the tree is planar —
+// i.e. the two matches that feed a match sit directly to its left. The API
+// returns knockout matches in date order, not bracket order, so we can't assume
+// match i is fed by matches 2i / 2i+1. Instead we anchor on the Final and walk
+// right→left: each round is ordered to line up with the (already-ordered) round
+// to its right, by following who actually advanced (winner identity). Slots whose
+// feeder isn't decided yet (TBD) are filled with the remaining matches in order,
+// and self-correct as results come in.
+// Returns, per round key, an array of indices into state.bracket[key].
+function bracketColumnOrders() {
+  const keys = ['r32', 'r16', 'qf', 'sf', 'final'];
+  const orders = { final: state.bracket.final.map((_, i) => i) };
+
+  for (let k = keys.length - 2; k >= 0; k--) {
+    const cur       = state.bracket[keys[k]];
+    const next      = state.bracket[keys[k + 1]];
+    const nextOrder = orders[keys[k + 1]];
+    const used      = new Array(cur.length).fill(false);
+    const slots     = new Array(cur.length).fill(-1);
+
+    // Place the matches whose winner is already known into the slot feeding the
+    // next-round match they advanced to.
+    nextOrder.forEach((nIdx, pos) => {
+      const m = next[nIdx];
+      [m.teamA, m.teamB].forEach((team, side) => {
+        if (!team) return;
+        const f = cur.findIndex((cm, idx) => !used[idx] && cm.winner && cm.winner === team);
+        if (f >= 0) { used[f] = true; slots[2 * pos + side] = f; }
+      });
+    });
+
+    // Fill the undecided slots with whatever matches are left, in original order.
+    const remaining = [];
+    for (let i = 0; i < cur.length; i++) if (!used[i]) remaining.push(i);
+    let ri = 0;
+    for (let p = 0; p < slots.length; p++) if (slots[p] === -1) slots[p] = remaining[ri++];
+
+    orders[keys[k]] = slots;
+  }
+  return orders;
+}
+
 function renderBracket() {
   const ROUNDS = [
     {key:'r32',   label:'Round of 32'},
@@ -848,8 +890,13 @@ function renderBracket() {
     {key:'final', label:'Final'}
   ];
 
+  const orders = bracketColumnOrders();
   const cols = ROUNDS.map(r => {
-    const matches = state.bracket[r.key].map((m, i) => renderBracketMatch(m, r.key, i)).join('');
+    // Render in bracket-display order, but pass each match its ORIGINAL state
+    // index so admin edits still target the right slot.
+    const matches = orders[r.key]
+      .map(i => renderBracketMatch(state.bracket[r.key][i], r.key, i))
+      .join('');
     return '<div class="b-round">'
       + '<div class="b-round-label">' + r.label + '</div>'
       + '<div class="b-round-matches">' + matches + '</div>'
