@@ -70,7 +70,7 @@ const FLAGS = {
   'Panama':'🇵🇦','Paraguay':'🇵🇾','Portugal':'🇵🇹','Qatar':'🇶🇦',
   'Saudi Arabia':'🇸🇦','Scotland':'🏴󠁧󠁢󠁳󠁣󠁴󠁿','Senegal':'🇸🇳',
   'South Africa':'🇿🇦','Spain':'🇪🇸','Sweden':'🇸🇪','Switzerland':'🇨🇭',
-  'Türkiye':'🇹🇷','Uruguay':'🇺🇾','USA':'🇺🇸','Uzbekistan':'🇺🇿'
+  'Tunisia':'🇹🇳','Türkiye':'🇹🇷','Uruguay':'🇺🇾','USA':'🇺🇸','Uzbekistan':'🇺🇿'
 };
 
 // Derived lookups built at load time

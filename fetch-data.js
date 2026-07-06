@@ -220,7 +220,19 @@ async function main() {
       if (canBeat < 2) guaranteedQualified.add(row.team);
     });
   });
-  // Note: 3rd-place qualification (best 8 of 12) depends on cross-group stats — not computed here.
+  // Once the full Round-of-32 line-up is known, any team not in it is out.
+  // This catches 3rd-place teams that missed the best-8 cut, which the
+  // per-group maths above can't detect.
+  const r32Teams = new Set();
+  knockoutMatches.r32.forEach(m => {
+    if (m.home) r32Teams.add(m.home);
+    if (m.away) r32Teams.add(m.away);
+  });
+  if (r32Teams.size === 32) {
+    Object.values(groupTeams).forEach(teamsSet => teamsSet.forEach(t => {
+      if (!r32Teams.has(t)) eliminated.add(t);
+    }));
+  }
 
   // ─── Write live.js ──────────────────────────────────────────────────────────
 
